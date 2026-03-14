@@ -1,0 +1,69 @@
+[project]
+name = "tax-advisor"
+version = "0.1.1"
+description = "An agentic AI tax advisor CLI chat app"
+readme = "README.md"
+license = "MIT"
+authors = [
+    { name = "DevX", email = "dev.rajbanshi@gmail.com" }
+]
+requires-python = ">=3.11"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: Office/Business :: Financial",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "litellm",
+    "openai",
+    "rich",
+    "prompt-toolkit",
+    "docling",
+    "chromadb",
+    "presidio-analyzer",
+    "presidio-anonymizer",
+    "spacy",
+    "pyyaml",
+    "python-dotenv",
+    "langchain-text-splitters",
+    "pip",
+]
+
+[project.optional-dependencies]
+bedrock = ["boto3"]
+
+[project.urls]
+Homepage = "https://github.com/kntc847/tax-advisor"
+Repository = "https://github.com/kntc847/tax-advisor"
+
+[dependency-groups]
+dev = [
+    "jupyter",
+    "ipykernel",
+    "ruff",
+    "boto3",
+]
+
+[project.scripts]
+tax-advisor = "tax_advisor.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/tax_advisor"]
+
+[tool.hatch.build.targets.sdist]
+exclude = [
+    "chroma_db/",
+    "documents/",
+    "markdowns/",
+    "notebooks/",
+    "personal/",
+    ".sessions/",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
