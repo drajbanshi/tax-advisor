@@ -103,21 +103,32 @@ def _first_run_check(settings: Settings, console: Console) -> None:
             from tax_advisor.rag.pipeline import ingest_documents
 
             console.print()
-            ingest_documents(
+            ingested = ingest_documents(
                 ref_dir,
                 settings,
                 console,
                 skip_redaction=True,
             )
+            if ingested > 0:
+                settings.initialized_sentinel.touch()
+            else:
+                console.print(
+                    "[yellow]Ingestion failed. You will be prompted again "
+                    "next time, or run [bold]/ingest --reference[/bold] "
+                    "to retry.[/yellow]\n"
+                )
         else:
-            console.print("[yellow]No documents were downloaded successfully.[/yellow]\n")
+            console.print(
+                "[yellow]No documents were downloaded. You will be prompted "
+                "again next time, or run [bold]/ingest --reference[/bold] "
+                "to retry.[/yellow]\n"
+            )
     else:
         console.print(
-            "[dim]Skipped. You can ingest later with "
-            "[bold]/ingest <path> --reference --no-redact[/bold][/dim]\n"
+            "[dim]Skipped. Run [bold]/ingest --reference[/bold] "
+            "any time to download and ingest.[/dim]\n"
         )
-
-    settings.initialized_sentinel.touch()
+        settings.initialized_sentinel.touch()
 
 
 def main() -> None:
@@ -529,18 +540,29 @@ def _handle_command(
             p for p in parts[1:]
             if p not in ("--reference", "--no-redact")
         ]
-        docs_dir = Path(path_parts[0]) if path_parts else settings.docs_dir
 
         try:
             from tax_advisor.rag.pipeline import ingest_documents
 
             if is_reference:
-                # Ingest into the persistent IRS reference collection
+                if path_parts:
+                    docs_dir = Path(path_parts[0])
+                else:
+                    # No path given — download reference docs automatically
+                    from tax_advisor.data import download_reference_docs
+
+                    console.print("Downloading IRS reference documents …")
+                    docs_dir = download_reference_docs(
+                        settings.data_dir, console,
+                    )
+                    skip_redaction = True
+
                 ingest_documents(
                     docs_dir, settings, console,
                     skip_redaction=skip_redaction,
                 )
             else:
+                docs_dir = Path(path_parts[0]) if path_parts else settings.docs_dir
                 # Ingest into the session collection (PII redaction always on)
                 ingest_documents(
                     docs_dir, settings, console,

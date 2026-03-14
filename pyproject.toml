@@ -1,6 +1,6 @@
 [project]
 name = "tax-advisor"
-version = "0.1.2"
+version = "0.1.3"
 description = "An agentic AI tax advisor CLI chat app"
 readme = "README.md"
 license = "MIT"
