@@ -46,6 +46,7 @@ Commands:
   [bold]/ingest [path] --reference [--no-redact][/bold]  Ingest into IRS reference collection [dim](default: documents/)[/dim]
   [bold]/index[/bold]             Show vector index statistics
   [bold]/apikey[/bold]            Set or update your OpenAI API key
+  [bold]/reset[/bold]             Delete all data and start fresh
 """
 
 
@@ -612,6 +613,49 @@ def _handle_command(
         else:
             console.print("[dim]Key unchanged.[/dim]\n")
         return True
+
+    # -- Reset command --------------------------------------------------------
+
+    if lower == "/reset":
+        import shutil
+
+        console.print(
+            f"[bold red]This will delete everything[/bold red] in "
+            f"[cyan]{settings.data_dir}[/cyan]:\n"
+            f"  • ChromaDB index (reference + session embeddings)\n"
+            f"  • Downloaded reference documents\n"
+            f"  • All saved sessions\n"
+            f"  • First-run state (you will be prompted to set up again)\n\n"
+            f"  [dim]Your API key in {settings.env_file} will be kept.[/dim]"
+        )
+        confirm = console.input("\nType [bold]yes[/bold] to confirm: ").strip().lower()
+        if confirm != "yes":
+            console.print("[dim]Reset cancelled.[/dim]\n")
+            return True
+
+        # Preserve the .env file
+        env_backup = None
+        if settings.env_file.exists():
+            env_backup = settings.env_file.read_text(encoding="utf-8")
+
+        # Wipe the data directory
+        if settings.data_dir.exists():
+            shutil.rmtree(settings.data_dir)
+        settings.data_dir.mkdir(parents=True, exist_ok=True)
+
+        # Restore .env
+        if env_backup is not None:
+            settings.env_file.write_text(env_backup, encoding="utf-8")
+
+        # Clear in-memory state
+        agent.clear_history()
+        settings.session_collection = None
+
+        console.print(
+            "[green]All data deleted.[/green] "
+            "Restart tax-advisor to set up again.\n"
+        )
+        return None  # exit the REPL
 
     console.print(f"[yellow]Unknown command: {text}[/yellow]\n")
     return True

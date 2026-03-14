@@ -9,6 +9,7 @@ import litellm
 
 # Suppress litellm's noisy logging by default.
 litellm.suppress_debug_info = True
+litellm.drop_params = True
 
 
 def chat_completion(
