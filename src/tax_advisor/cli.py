@@ -50,6 +50,93 @@ Commands:
 """
 
 
+def _persist_to_env_file(env_file: Path, name: str, value: str) -> None:
+    """Upsert *name=value* in the given .env file."""
+    env_file.parent.mkdir(parents=True, exist_ok=True)
+    lines: list[str] = []
+    replaced = False
+    if env_file.exists():
+        for line in env_file.read_text(encoding="utf-8").splitlines():
+            if line.startswith(f"{name}="):
+                lines.append(f"{name}={value}")
+                replaced = True
+            else:
+                lines.append(line)
+    if not replaced:
+        lines.append(f"{name}={value}")
+    env_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _initial_setup(data_dir: Path, console: Console) -> None:
+    """Prompt for provider and credentials on first run when no provider is configured."""
+    env_file = data_dir / ".env"
+
+    # Check if user-level .env already has a provider configured
+    if env_file.exists():
+        for line in env_file.read_text(encoding="utf-8").splitlines():
+            if line.strip().startswith("TAX_ADVISOR_PROVIDER="):
+                return  # Already configured
+
+    console.print(
+        "\n[bold green]Welcome to tax-advisor![/bold green]\n"
+        "Let's set up your LLM provider.\n"
+    )
+    console.print("  [bold]1[/bold] — openai")
+    console.print("  [bold]2[/bold] — bedrock  [dim](AWS)[/dim]")
+    console.print("  [bold]3[/bold] — llama    [dim](local Ollama)[/dim]")
+    console.print()
+
+    choice = console.input("Select provider [1/2/3]: ").strip()
+    provider_map = {"1": "openai", "2": "bedrock", "3": "llama"}
+    provider = provider_map.get(choice)
+
+    if not provider:
+        # Allow typing the provider name directly
+        if choice.lower() in ("openai", "bedrock", "llama"):
+            provider = choice.lower()
+        else:
+            console.print("[yellow]Invalid choice. Defaulting to openai.[/yellow]\n")
+            provider = "openai"
+
+    _persist_to_env_file(env_file, "TAX_ADVISOR_PROVIDER", provider)
+    os.environ["TAX_ADVISOR_PROVIDER"] = provider
+
+    if provider == "bedrock":
+        profile = console.input("Enter your AWS profile name: ").strip()
+        if profile:
+            _persist_to_env_file(env_file, "TAX_ADVISOR_AWS_PROFILE", profile)
+            os.environ["TAX_ADVISOR_AWS_PROFILE"] = profile
+            console.print(
+                f"\n[green]Provider set to bedrock "
+                f"(profile: {profile}). Saved to {env_file}[/green]\n"
+            )
+        else:
+            console.print(
+                "\n[yellow]No profile provided. Set TAX_ADVISOR_AWS_PROFILE "
+                "or use [bold]/provider bedrock <profile>[/bold] later.[/yellow]\n"
+            )
+    elif provider == "openai":
+        console.print(
+            "\nAn API key is required for the OpenAI provider.\n"
+            "You can get one at [link=https://platform.openai.com/api-keys]"
+            "https://platform.openai.com/api-keys[/link]\n"
+        )
+        key = console.input("Enter your OpenAI API key: ").strip()
+        if key:
+            _persist_to_env_file(env_file, "OPENAI_API_KEY", key)
+            os.environ["OPENAI_API_KEY"] = key
+            console.print(
+                f"\n[green]Provider set to openai. "
+                f"API key saved to {env_file}[/green]\n"
+            )
+        else:
+            console.print(
+                "\n[yellow]No key provided. Use [bold]/apikey[/bold] to set it later.[/yellow]\n"
+            )
+    else:
+        console.print(f"\n[green]Provider set to {provider}. Saved to {env_file}[/green]\n")
+
+
 def _ensure_openai_api_key(settings: Settings, console: Console) -> None:
     """Prompt for an OpenAI API key if the provider needs one and none is set."""
     if settings.provider != "openai":
@@ -145,6 +232,9 @@ def main() -> None:
     data_dir = Path(os.environ.get("TAX_ADVISOR_DATA_DIR", str(Path.home() / ".tax-advisor")))
     data_dir.mkdir(parents=True, exist_ok=True)
     load_dotenv(data_dir / ".env")
+
+    # First-time provider setup (before Settings is created)
+    _initial_setup(data_dir, console)
 
     settings = Settings()
     set_tool_settings(settings)

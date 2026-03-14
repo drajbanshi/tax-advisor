@@ -43,10 +43,13 @@ def chat_completion(
     }
     if tools:
         kwargs["tools"] = tools
-    if api_key:
+
+    is_bedrock = model.lower().startswith("bedrock/")
+
+    if api_key and not is_bedrock:
         kwargs["api_key"] = api_key
 
-    if model.lower().startswith("bedrock/"):
+    if is_bedrock:
         try:
             import boto3  # noqa: F401
         except ModuleNotFoundError as exc:
@@ -54,7 +57,7 @@ def chat_completion(
                 "Bedrock provider requires boto3. Run `uv sync` to install dependencies."
             ) from exc
 
-    if model.lower().startswith("bedrock/") and bedrock_profile:
+    if is_bedrock and bedrock_profile:
         # Prefer profile-based auth for Bedrock.
         kwargs["aws_profile_name"] = bedrock_profile
         os.environ["AWS_PROFILE"] = bedrock_profile
