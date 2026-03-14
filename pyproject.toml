@@ -37,8 +37,8 @@ dependencies = [
 bedrock = ["boto3"]
 
 [project.urls]
-Homepage = "https://github.com/kntc847/tax-advisor"
-Repository = "https://github.com/kntc847/tax-advisor"
+Homepage = "https://github.com/drajbanshi/tax-advisor"
+Repository = "https://github.com/drajbanshi/tax-advisor"
 
 [dependency-groups]
 dev = [

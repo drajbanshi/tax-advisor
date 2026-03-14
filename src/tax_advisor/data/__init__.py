@@ -10,8 +10,8 @@ from rich.console import Console
 # Remote locations for bundled IRS reference markdowns.
 # Keys are local filenames, values are public download URLs.
 REFERENCE_DOCS: dict[str, str] = {
-    "1040.md": "https://raw.githubusercontent.com/kntc847/tax-advisor/main/markdowns/1040.md",
-    "p17.md": "https://raw.githubusercontent.com/kntc847/tax-advisor/main/markdowns/p17.md",
+    "1040.md": "https://raw.githubusercontent.com/drajbanshi/tax-advisor/main/markdowns/1040.md",
+    "p17.md": "https://raw.githubusercontent.com/drajbanshi/tax-advisor/main/markdowns/p17.md",
 }
 
 
