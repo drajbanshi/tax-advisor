@@ -14,3 +14,7 @@ wheels/
 
 # Session data
 .sessions/
+.idea
+chroma_db
+documents
+markdowns
