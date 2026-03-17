@@ -69,6 +69,12 @@ class Agent:
                 "[yellow]Warning: reached maximum tool call rounds.[/yellow]"
             )
 
+    def _active_api_key(self) -> str | None:
+        """Return the appropriate API key for the current provider."""
+        if self.settings.provider == "anthropic":
+            return self.settings.anthropic_api_key or None
+        return self.settings.openai_api_key or None
+
     def _get_response(self, stream: bool = True) -> Any:
         """Send the current conversation to the model."""
         return chat_completion(
@@ -78,7 +84,7 @@ class Agent:
             tools=TOOL_DEFINITIONS,
             stream=stream,
             bedrock_profile=self.settings.bedrock_profile,
-            api_key=self.settings.openai_api_key or None,
+            api_key=self._active_api_key(),
         )
 
     def _handle_stream(self, response: Any) -> dict[str, Any]:
@@ -144,7 +150,7 @@ class Agent:
                 tools=TOOL_DEFINITIONS,
                 stream=False,
                 bedrock_profile=self.settings.bedrock_profile,
-                api_key=self.settings.openai_api_key or None,
+                api_key=self._active_api_key(),
             )
             choice = response.choices[0]
             assistant_msg = choice.message.model_dump()

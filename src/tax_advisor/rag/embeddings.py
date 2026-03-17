@@ -1,4 +1,4 @@
-"""Text embeddings for Bedrock Titan and OpenAI."""
+"""Text embeddings for local (ChromaDB default), Bedrock Titan, and OpenAI."""
 
 from __future__ import annotations
 
@@ -94,6 +94,29 @@ class BedrockEmbeddings:
         return result["embedding"]
 
 
+class LocalEmbeddings:
+    """Generate text embeddings locally using ChromaDB's default model.
+
+    Uses the ``all-MiniLM-L6-v2`` sentence-transformer via onnxruntime.
+    No API key required — runs entirely on-device.
+    """
+
+    def __init__(self) -> None:
+        from chromadb.utils.embedding_functions import DefaultEmbeddingFunction
+
+        self._ef = DefaultEmbeddingFunction()
+
+    def embed_query(self, text: str) -> list[float]:
+        """Embed a single query string."""
+        return self._ef([text])[0]
+
+    def embed_texts(self, texts: list[str]) -> list[list[float]]:
+        """Embed a batch of texts."""
+        if not texts:
+            return []
+        return self._ef(texts)
+
+
 class OpenAIEmbeddings:
     """Generate text embeddings via the OpenAI API.
 
@@ -159,8 +182,10 @@ class OpenAIEmbeddings:
 # -- Factory ------------------------------------------------------------------
 
 _PROVIDER_DEFAULT_EMBEDDING_MODELS: dict[str, str] = {
+    "anthropic": "local",
     "openai": "text-embedding-3-small",
     "bedrock": "amazon.titan-embed-text-v2:0",
+    "llama": "local",
 }
 
 
@@ -178,6 +203,8 @@ def build_embeddings(settings: Settings) -> Embeddings:
             model_id=settings.embedding_model,
             profile_name=settings.bedrock_profile,
         )
+    if settings.embedding_model == "local":
+        return LocalEmbeddings()
     return OpenAIEmbeddings(
         model=settings.embedding_model,
         api_key=settings.openai_api_key or None,

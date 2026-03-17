@@ -7,6 +7,40 @@
 
 ---
 
+## Quick Install (Recommended)
+
+If you have Python 3.11+ already installed (or want the script to check for you), run the one-liner:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/drajbanshi/tax-advisor/main/install.sh | bash
+```
+
+Or download and run manually:
+
+```bash
+curl -fsSL -o install.sh https://raw.githubusercontent.com/drajbanshi/tax-advisor/main/install.sh
+chmod +x install.sh
+./install.sh
+```
+
+The install script will:
+
+1. Find a suitable Python (>= 3.11) on your system
+2. Create a virtual environment at `~/.tax-advisor/venv`
+3. Install `tax-advisor` from PyPI
+4. Download the required spaCy language model
+5. Create a `tax-advisor` wrapper script at `~/.tax-advisor/bin/`
+
+After installation, add `~/.tax-advisor/bin` to your PATH (the script will print the exact command), then run:
+
+```bash
+tax-advisor
+```
+
+If the script reports that Python 3.11+ is not found, follow the manual steps below to install it first.
+
+---
+
 ## 1. Install Python 3.11 with mise
 
 [mise](https://mise.jdx.dev/) is a polyglot runtime manager that makes it easy to install and switch between Python versions.
@@ -195,8 +229,6 @@ Once inside the tax-advisor REPL, the following slash commands are available:
 | `/end-session` | Delete current session and start fresh |
 | `/provider <name>` | Switch provider (`openai`, `bedrock`, `llama`) |
 | `/model <name>` | Switch to a different model |
-| `/upload <path> [path2 ...]` | Extract W-2/1099 from images or YAML files and ingest |
-| `/template <w2\|1099>` | Generate a blank YAML template file |
 | `/ingest [path]` | Ingest PDF/markdown docs into session (default: `documents/`) |
 | `/ingest [path] --reference [--no-redact]` | Ingest into IRS reference collection |
 | `/index` | Show vector index statistics |
@@ -213,40 +245,7 @@ On the first launch, tax-advisor will offer to download and ingest IRS reference
 
 ---
 
-## 8. Uploading Tax Documents
-
-### From images (W-2 / 1099)
-
-```
-you> /upload path/to/w2-photo.png path/to/1099-page1.jpg
-```
-
-tax-advisor classifies each image, extracts the relevant form data, and ingests it into your session's vector store.
-
-### From YAML templates
-
-Generate a blank template, fill in your data, then upload:
-
-```
-you> /template w2
-Template written: w2_template.yaml
-Fill in the values, then run: /upload w2_template.yaml
-
-you> /upload w2_template.yaml
-```
-
----
-
-## 9. Troubleshooting
-
-**"No OpenAI API key found"** — Set your key using any method from Section 4 above.
-
-**spaCy model not found** — The PII redactor requires a spaCy language model. Install it with:
-
-```bash
-python -m spacy download en_core_web_lg
-```
-
-**ChromaDB errors** — Try resetting the data directory with `/reset` inside the CLI, then restart.
-
-**Permission denied on mise** — Ensure mise is properly added to your shell PATH. Run `mise doctor` to diagnose issues.
+## 8.Sample Questions
+1. Whats the standard deduction for the year 2025?
+2. Whats the SALT limit for year 2025?
+3. Prepare my taxes with provided information: copy paste filled prompt [earning](prepare_my_tax.md))

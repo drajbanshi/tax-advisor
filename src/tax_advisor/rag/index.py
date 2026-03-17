@@ -34,12 +34,25 @@ class VectorIndex:
         chroma_dir: str | Path,
         collection_name: str,
         embeddings: Embeddings,
+        embedding_model: str = "",
     ) -> None:
         self._embeddings = embeddings
         self._client = chromadb.PersistentClient(path=str(chroma_dir))
+        meta = {"hnsw:space": "cosine"}
+        if embedding_model:
+            meta["embedding_model"] = embedding_model
+
+        # If the collection exists with a different embedding model, recreate it
+        existing_collections = {c.name for c in self._client.list_collections()}
+        if collection_name in existing_collections and embedding_model:
+            existing = self._client.get_collection(name=collection_name)
+            stored_model = (existing.metadata or {}).get("embedding_model", "")
+            if stored_model != embedding_model:
+                self._client.delete_collection(name=collection_name)
+
         self._collection = self._client.get_or_create_collection(
             name=collection_name,
-            metadata={"hnsw:space": "cosine"},
+            metadata=meta,
         )
 
     def add_chunks(self, chunks: list[Chunk]) -> None:
@@ -111,6 +124,10 @@ class VectorIndex:
             )
 
         return search_results
+
+    def count(self) -> int:
+        """Return the number of documents in the collection."""
+        return self._collection.count()
 
     def delete_collection(self) -> None:
         """Delete the underlying ChromaDB collection."""

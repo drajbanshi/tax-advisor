@@ -11,6 +11,7 @@ from tax_advisor.config import Settings
 from tax_advisor.ingestion.extract import MarkdownDocument, extract_metadata
 from tax_advisor.ingestion.loader import (
     discover_documents,
+    discover_markdowns,
     load_markdown,
     load_pdf_as_markdown,
 )
@@ -21,13 +22,45 @@ from tax_advisor.rag.retrieve import retrieve
 
 
 def _build_index(settings: Settings) -> VectorIndex:
-    """Construct a :class:`VectorIndex` from application settings."""
+    """Construct a :class:`VectorIndex` from application settings.
+
+    On first access (empty collection) the bundled IRS reference markdowns
+    are automatically ingested so the user has a working index out of the box.
+    """
     embeddings = build_embeddings(settings)
-    return VectorIndex(
+    index = VectorIndex(
         chroma_dir=settings.chroma_dir,
         collection_name=settings.chroma_collection,
         embeddings=embeddings,
+        embedding_model=settings.embedding_model,
     )
+
+    if index.count() == 0:
+        _auto_ingest_bundled_refs(index, settings)
+
+    return index
+
+
+def _auto_ingest_bundled_refs(index: VectorIndex, settings: Settings) -> None:
+    """Ingest the reference markdowns shipped inside the package."""
+    from tax_advisor.data import bundled_reference_dir
+
+    ref_dir = bundled_reference_dir()
+    if not ref_dir.is_dir():
+        return
+
+    docs = list(discover_markdowns(ref_dir))
+    if not docs:
+        return
+
+    for doc_path in docs:
+        try:
+            markdown = load_markdown(doc_path)
+            metadata = extract_metadata(doc_path)
+            chunks = chunk_markdown(markdown, metadata=metadata)
+            index.add_chunks(chunks)
+        except Exception:
+            pass  # best-effort; user can always /ingest --reference
 
 
 def _build_session_index(settings: Settings) -> VectorIndex | None:
@@ -42,6 +75,7 @@ def _build_session_index(settings: Settings) -> VectorIndex | None:
         chroma_dir=settings.chroma_dir,
         collection_name=settings.session_collection,
         embeddings=embeddings,
+        embedding_model=settings.embedding_model,
     )
 
 
@@ -92,6 +126,7 @@ def ingest_documents(
             chroma_dir=settings.chroma_dir,
             collection_name=collection_override,
             embeddings=embeddings,
+            embedding_model=settings.embedding_model,
         )
     else:
         index = _build_index(settings)
@@ -187,6 +222,7 @@ def ingest_markdown_text(
             chroma_dir=settings.chroma_dir,
             collection_name=collection_override,
             embeddings=embeddings,
+            embedding_model=settings.embedding_model,
         )
     else:
         index = _build_index(settings)

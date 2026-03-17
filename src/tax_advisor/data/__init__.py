@@ -1,18 +1,24 @@
-"""Download and manage IRS reference documents."""
+"""Bundled IRS reference documents shipped with the package."""
 
 from __future__ import annotations
 
 import urllib.request
+from importlib import resources
 from pathlib import Path
 
 from rich.console import Console
 
-# Remote locations for bundled IRS reference markdowns.
+# Remote locations for IRS reference markdowns (used by /ingest --reference).
 # Keys are local filenames, values are public download URLs.
 REFERENCE_DOCS: dict[str, str] = {
     "1040.md": "https://raw.githubusercontent.com/drajbanshi/tax-advisor/main/markdowns/1040.md",
     "p17.md": "https://raw.githubusercontent.com/drajbanshi/tax-advisor/main/markdowns/p17.md",
 }
+
+
+def bundled_reference_dir() -> Path:
+    """Return the path to the reference docs bundled inside the package."""
+    return Path(str(resources.files("tax_advisor.data") / "reference"))
 
 
 def get_reference_docs_dir(data_dir: Path) -> Path:

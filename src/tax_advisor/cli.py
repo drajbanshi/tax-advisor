@@ -7,7 +7,9 @@ from pathlib import Path
 from typing import Any
 
 from prompt_toolkit import PromptSession
+from prompt_toolkit.filters import is_done
 from prompt_toolkit.history import InMemoryHistory
+from prompt_toolkit.key_binding import KeyBindings, KeyPressEvent
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
@@ -28,8 +30,9 @@ WELCOME_MESSAGE = """\
 
 Provider: [cyan]{provider}[/cyan]
 Model: [cyan]{model}[/cyan]
+Embedding: [cyan]{embedding_model}[/cyan]
 Session: [cyan]{session_id}[/cyan]
-Type your question and press [bold]Enter[/bold]. Use [bold]Alt+Enter[/bold] for multi-line input.
+Type your question and press [bold]Enter[/bold] to send. Paste multi-line text directly.
 
 Commands:
   [bold]/quit[/bold]              Exit the chat
@@ -38,14 +41,12 @@ Commands:
   [bold]/sessions[/bold]          List saved sessions
   [bold]/continue <id>[/bold]     Resume a previous session
   [bold]/end-session[/bold]       Delete current session and start fresh
-  [bold]/provider <name>[/bold]   [dim](openai|bedrock|llama)[/dim]
+  [bold]/provider <name>[/bold]   [dim](anthropic|openai|bedrock|llama)[/dim]
   [bold]/model <name>[/bold]      Switch to a different model
-  [bold]/upload <path> [path2 ...][/bold]   Extract W-2/1099 from images/YAML and ingest
-  [bold]/template <w2|1099>[/bold]  Generate a blank YAML template file
   [bold]/ingest [path][/bold]     Ingest PDF/markdown docs into session [dim](default: documents/)[/dim]
   [bold]/ingest [path] --reference [--no-redact][/bold]  Ingest into IRS reference collection [dim](default: documents/)[/dim]
   [bold]/index[/bold]             Show vector index statistics
-  [bold]/apikey[/bold]            Set or update your OpenAI API key
+  [bold]/apikey[/bold]            Set or update your API key
   [bold]/reset[/bold]             Delete all data and start fresh
 """
 
@@ -81,27 +82,45 @@ def _initial_setup(data_dir: Path, console: Console) -> None:
         "\n[bold green]Welcome to tax-advisor![/bold green]\n"
         "Let's set up your LLM provider.\n"
     )
-    console.print("  [bold]1[/bold] — openai")
-    console.print("  [bold]2[/bold] — bedrock  [dim](AWS)[/dim]")
-    console.print("  [bold]3[/bold] — llama    [dim](local Ollama)[/dim]")
+    console.print("  [bold]1[/bold] — anthropic [dim](Claude, default)[/dim]")
+    console.print("  [bold]2[/bold] — bedrock   [dim](AWS)[/dim]")
+    console.print("  [bold]3[/bold] — llama     [dim](local Ollama)[/dim]")
     console.print()
 
     choice = console.input("Select provider [1/2/3]: ").strip()
-    provider_map = {"1": "openai", "2": "bedrock", "3": "llama"}
+    provider_map = {"1": "anthropic", "2": "bedrock", "3": "llama"}
     provider = provider_map.get(choice)
 
     if not provider:
         # Allow typing the provider name directly
-        if choice.lower() in ("openai", "bedrock", "llama"):
+        if choice.lower() in ("anthropic", "bedrock", "llama"):
             provider = choice.lower()
         else:
-            console.print("[yellow]Invalid choice. Defaulting to openai.[/yellow]\n")
-            provider = "openai"
+            console.print("[dim]Defaulting to anthropic.[/dim]\n")
+            provider = "anthropic"
 
     _persist_to_env_file(env_file, "TAX_ADVISOR_PROVIDER", provider)
     os.environ["TAX_ADVISOR_PROVIDER"] = provider
 
-    if provider == "bedrock":
+    if provider == "anthropic":
+        console.print(
+            "\nAn API key is required for the Anthropic provider.\n"
+            "You can get one at [link=https://console.anthropic.com/settings/keys]"
+            "https://console.anthropic.com/settings/keys[/link]\n"
+        )
+        key = console.input("Enter your Anthropic API key: ").strip()
+        if key:
+            _persist_to_env_file(env_file, "ANTHROPIC_API_KEY", key)
+            os.environ["ANTHROPIC_API_KEY"] = key
+            console.print(
+                f"\n[green]Provider set to anthropic. "
+                f"API key saved to {env_file}[/green]\n"
+            )
+        else:
+            console.print(
+                "\n[yellow]No key provided. Use [bold]/apikey[/bold] to set it later.[/yellow]\n"
+            )
+    elif provider == "bedrock":
         profile = console.input("Enter your AWS profile name: ").strip()
         if profile:
             _persist_to_env_file(env_file, "TAX_ADVISOR_AWS_PROFILE", profile)
@@ -114,24 +133,6 @@ def _initial_setup(data_dir: Path, console: Console) -> None:
             console.print(
                 "\n[yellow]No profile provided. Set TAX_ADVISOR_AWS_PROFILE "
                 "or use [bold]/provider bedrock <profile>[/bold] later.[/yellow]\n"
-            )
-    elif provider == "openai":
-        console.print(
-            "\nAn API key is required for the OpenAI provider.\n"
-            "You can get one at [link=https://platform.openai.com/api-keys]"
-            "https://platform.openai.com/api-keys[/link]\n"
-        )
-        key = console.input("Enter your OpenAI API key: ").strip()
-        if key:
-            _persist_to_env_file(env_file, "OPENAI_API_KEY", key)
-            os.environ["OPENAI_API_KEY"] = key
-            console.print(
-                f"\n[green]Provider set to openai. "
-                f"API key saved to {env_file}[/green]\n"
-            )
-        else:
-            console.print(
-                "\n[yellow]No key provided. Use [bold]/apikey[/bold] to set it later.[/yellow]\n"
             )
     else:
         console.print(f"\n[green]Provider set to {provider}. Saved to {env_file}[/green]\n")
@@ -155,6 +156,29 @@ def _ensure_openai_api_key(settings: Settings, console: Console) -> None:
         console.print("[red]No key provided. Some features will not work.[/red]\n")
         return
     settings.set_openai_api_key(key)
+    console.print(
+        f"[green]API key saved to {settings.env_file}[/green]\n"
+    )
+
+
+def _ensure_anthropic_api_key(settings: Settings, console: Console) -> None:
+    """Prompt for an Anthropic API key if the provider needs one and none is set."""
+    if settings.provider != "anthropic":
+        return
+    if settings.anthropic_api_key:
+        return
+
+    console.print(
+        "\n[bold yellow]No Anthropic API key found.[/bold yellow]\n"
+        "An API key is required for the Anthropic provider.\n"
+        "You can get one at [link=https://console.anthropic.com/settings/keys]"
+        "https://console.anthropic.com/settings/keys[/link]\n"
+    )
+    key = console.input("Enter your Anthropic API key: ").strip()
+    if not key:
+        console.print("[red]No key provided. Some features will not work.[/red]\n")
+        return
+    settings.set_anthropic_api_key(key)
     console.print(
         f"[green]API key saved to {settings.env_file}[/green]\n"
     )
@@ -239,11 +263,9 @@ def main() -> None:
     settings = Settings()
     set_tool_settings(settings)
 
-    # Prompt for OpenAI API key if needed
+    # Prompt for API key if needed
+    _ensure_anthropic_api_key(settings, console)
     _ensure_openai_api_key(settings, console)
-
-    # First-run ingestion prompt
-    _first_run_check(settings, console)
 
     # Create initial session
     active_session = Session.create(sessions_dir=settings.sessions_dir)
@@ -256,6 +278,7 @@ def main() -> None:
             WELCOME_MESSAGE.format(
                 provider=settings.provider,
                 model=settings.model,
+                embedding_model=settings.embedding_model,
                 session_id=active_session.id,
             ),
             title="Welcome",
@@ -263,16 +286,25 @@ def main() -> None:
         )
     )
 
+    # Key bindings: Enter submits, Alt+Enter inserts newline.
+    # Pasted text (bracketed paste) is inserted literally, so multi-line
+    # pastes work without triggering submit.
+    kb = KeyBindings()
+
+    @kb.add("enter", filter=~is_done)
+    def _submit(event: KeyPressEvent) -> None:
+        event.current_buffer.validate_and_handle()
+
     session: PromptSession[str] = PromptSession(
         history=InMemoryHistory(),
-        multiline=False,
+        multiline=True,
+        key_bindings=kb,
     )
 
     while True:
         try:
             user_input = session.prompt(
                 "you> ",
-                multiline=False,
             )
         except (EOFError, KeyboardInterrupt):
             console.print("\n[dim]Goodbye![/dim]")
@@ -425,7 +457,7 @@ def _handle_command(
         if provider not in PROVIDER_DEFAULT_MODELS:
             console.print(
                 "[yellow]Unknown provider. Use one of: "
-                "openai, bedrock, llama[/yellow]\n"
+                "anthropic, openai, bedrock, llama[/yellow]\n"
             )
             return True
 
@@ -691,17 +723,30 @@ def _handle_command(
     # -- API key command ------------------------------------------------------
 
     if lower == "/apikey":
-        if settings.openai_api_key:
-            masked = settings.openai_api_key[:3] + "…" + settings.openai_api_key[-4:]
-            console.print(f"[dim]Current key:[/dim] [cyan]{masked}[/cyan]")
+        if settings.provider == "anthropic":
+            if settings.anthropic_api_key:
+                masked = settings.anthropic_api_key[:3] + "…" + settings.anthropic_api_key[-4:]
+                console.print(f"[dim]Current Anthropic key:[/dim] [cyan]{masked}[/cyan]")
+            else:
+                console.print("[dim]No Anthropic API key is currently set.[/dim]")
+            key = console.input("Enter new Anthropic API key (blank to keep current): ").strip()
+            if key:
+                settings.set_anthropic_api_key(key)
+                console.print(f"[green]API key updated and saved to {settings.env_file}[/green]\n")
+            else:
+                console.print("[dim]Key unchanged.[/dim]\n")
         else:
-            console.print("[dim]No OpenAI API key is currently set.[/dim]")
-        key = console.input("Enter new OpenAI API key (blank to keep current): ").strip()
-        if key:
-            settings.set_openai_api_key(key)
-            console.print(f"[green]API key updated and saved to {settings.env_file}[/green]\n")
-        else:
-            console.print("[dim]Key unchanged.[/dim]\n")
+            if settings.openai_api_key:
+                masked = settings.openai_api_key[:3] + "…" + settings.openai_api_key[-4:]
+                console.print(f"[dim]Current OpenAI key:[/dim] [cyan]{masked}[/cyan]")
+            else:
+                console.print("[dim]No OpenAI API key is currently set.[/dim]")
+            key = console.input("Enter new OpenAI API key (blank to keep current): ").strip()
+            if key:
+                settings.set_openai_api_key(key)
+                console.print(f"[green]API key updated and saved to {settings.env_file}[/green]\n")
+            else:
+                console.print("[dim]Key unchanged.[/dim]\n")
         return True
 
     # -- Reset command --------------------------------------------------------

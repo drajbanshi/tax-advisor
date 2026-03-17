@@ -7,11 +7,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 
-DEFAULT_PROVIDER = "openai"
-DEFAULT_MODEL = "gpt-4o"
+DEFAULT_PROVIDER = "anthropic"
+DEFAULT_MODEL = "anthropic/claude-opus-4-6-20250219"
 DEFAULT_TEMPERATURE = 0.3
 PROVIDER_DEFAULT_MODELS: dict[str, str] = {
-    "openai": "gpt-4o",
+    "anthropic": "anthropic/claude-opus-4-6-20250219",
+    "openai": "openai/gpt-4o",
     "bedrock": "bedrock/anthropic.claude-3-5-sonnet-20241022-v2:0",
     "llama": "ollama/llama3.1",
 }
@@ -23,7 +24,10 @@ DEFAULT_CHROMA_COLLECTION = "tax_documents"
 SYSTEM_PROMPT = """\
 You are an expert tax advisor AI assistant. You help users understand tax \
 concepts, answer questions about tax filing, deductions, credits, and tax \
-planning strategies. You can look up the current date when needed.
+planning strategies. You can look up the current date when needed. You know \
+all the tax rules for tax year 2025 from indexed Graph RAG.
+
+You can help prepare taxes, 1040 forms, require schedules and worksheets.
 
 When users ask about specific tax rules, forms, publications, or IRS guidance, \
 use the search_tax_documents tool to find relevant information from indexed \
@@ -41,6 +45,10 @@ publications where appropriate.
 def infer_provider_from_model(model: str) -> str | None:
     """Infer provider from a model identifier prefix."""
     lowered = model.lower()
+    if lowered.startswith("anthropic/"):
+        return "anthropic"
+    if lowered.startswith("openai/"):
+        return "openai"
     if lowered.startswith("bedrock/"):
         return "bedrock"
     if lowered.startswith("ollama/"):
@@ -51,8 +59,13 @@ def infer_provider_from_model(model: str) -> str | None:
 def normalize_model_for_provider(model: str, provider: str) -> str:
     """Normalize model IDs for provider-specific conventions."""
     normalized = model.strip()
-    if provider == "bedrock" and normalized and "/" not in normalized:
-        return f"bedrock/{normalized}"
+    if normalized and "/" not in normalized:
+        if provider == "anthropic":
+            return f"anthropic/{normalized}"
+        if provider == "bedrock":
+            return f"bedrock/{normalized}"
+        if provider == "openai":
+            return f"openai/{normalized}"
     return normalized
 
 
@@ -61,6 +74,24 @@ def _default_embedding_model(provider: str) -> str:
     from tax_advisor.rag.embeddings import default_embedding_model
 
     return default_embedding_model(provider)
+
+
+_PROVIDER_EMBEDDING_PREFIXES: dict[str, list[str]] = {
+    "bedrock": ["amazon."],
+    "openai": ["text-embedding-"],
+    "anthropic": ["local"],
+    "llama": ["local"],
+}
+
+
+def _validate_embedding_model(model: str, provider: str) -> str:
+    """Return model if it's compatible with provider, otherwise the provider default."""
+    if model == "local":
+        return model
+    prefixes = _PROVIDER_EMBEDDING_PREFIXES.get(provider, [])
+    if prefixes and not any(model.startswith(p) for p in prefixes):
+        return _default_embedding_model(provider)
+    return model
 
 
 @dataclass
@@ -109,6 +140,9 @@ class Settings:
     openai_api_key: str = field(
         default_factory=lambda: os.environ.get("OPENAI_API_KEY", "")
     )
+    anthropic_api_key: str = field(
+        default_factory=lambda: os.environ.get("ANTHROPIC_API_KEY", "")
+    )
     session_collection: str | None = field(default=None)
 
     def __post_init__(self) -> None:
@@ -135,6 +169,8 @@ class Settings:
         # Provider-aware embedding model default
         if not self.embedding_model:
             self.embedding_model = _default_embedding_model(self.provider)
+        else:
+            self.embedding_model = _validate_embedding_model(self.embedding_model, self.provider)
 
     @property
     def sessions_dir(self) -> Path:
@@ -161,6 +197,12 @@ class Settings:
         self.openai_api_key = key
         os.environ["OPENAI_API_KEY"] = key
         self._persist_env_var("OPENAI_API_KEY", key)
+
+    def set_anthropic_api_key(self, key: str) -> None:
+        """Store *key* in memory, the process environment, and the user env file."""
+        self.anthropic_api_key = key
+        os.environ["ANTHROPIC_API_KEY"] = key
+        self._persist_env_var("ANTHROPIC_API_KEY", key)
 
     def _persist_env_var(self, name: str, value: str) -> None:
         """Upsert *name=value* in :pyattr:`env_file`."""
