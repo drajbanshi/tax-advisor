@@ -175,7 +175,7 @@ def ingest_documents(
             console.print("    Embedding & indexing …")
             index.add_chunks(chunks)
             ingested += 1
-            console.print(f"    [green]✓ indexed[/green]")
+            console.print("    [green]✓ indexed[/green]")
         except Exception as exc:
             console.print(f"    [red]✗ error: {exc}[/red]")
 
