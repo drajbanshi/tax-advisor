@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -48,6 +49,7 @@ Commands:
   [bold]/index[/bold]             Show vector index statistics
   [bold]/apikey[/bold]            Set or update your API key
   [bold]/reset[/bold]             Delete all data and start fresh
+  [bold]/version[/bold]           Show version
 """
 
 
@@ -72,11 +74,11 @@ def _initial_setup(data_dir: Path, console: Console) -> None:
     """Prompt for provider and credentials on first run when no provider is configured."""
     env_file = data_dir / ".env"
 
-    # Check if user-level .env already has a provider configured
+    # Check if initial setup has already completed
     if env_file.exists():
         for line in env_file.read_text(encoding="utf-8").splitlines():
-            if line.strip().startswith("TAX_ADVISOR_PROVIDER="):
-                return  # Already configured
+            if line.strip() == "TAX_ADVISOR_INIT=true":
+                return  # Already initialized
 
     console.print(
         "\n[bold green]Welcome to tax-advisor![/bold green]\n"
@@ -186,8 +188,11 @@ def _ensure_anthropic_api_key(settings: Settings, console: Console) -> None:
 
 def _first_run_check(settings: Settings, console: Console) -> None:
     """Download IRS reference docs and offer to ingest them on first run."""
-    if settings.initialized_sentinel.exists():
-        return
+    env_file = settings.env_file
+    if env_file.exists():
+        for line in env_file.read_text(encoding="utf-8").splitlines():
+            if line.strip() == "TAX_ADVISOR_INIT=true":
+                return
 
     # Ensure data directory exists
     settings.data_dir.mkdir(parents=True, exist_ok=True)
@@ -195,7 +200,7 @@ def _first_run_check(settings: Settings, console: Console) -> None:
     from tax_advisor.data import REFERENCE_DOCS, download_reference_docs
 
     if not REFERENCE_DOCS:
-        settings.initialized_sentinel.touch()
+        _persist_to_env_file(settings.env_file, "TAX_ADVISOR_INIT", "true")
         return
 
     console.print(
@@ -222,7 +227,7 @@ def _first_run_check(settings: Settings, console: Console) -> None:
                 skip_redaction=True,
             )
             if ingested > 0:
-                settings.initialized_sentinel.touch()
+                _persist_to_env_file(settings.env_file, "TAX_ADVISOR_INIT", "true")
             else:
                 console.print(
                     "[yellow]Ingestion failed. You will be prompted again "
@@ -240,11 +245,17 @@ def _first_run_check(settings: Settings, console: Console) -> None:
             "[dim]Skipped. Run [bold]/ingest --reference[/bold] "
             "any time to download and ingest.[/dim]\n"
         )
-        settings.initialized_sentinel.touch()
+        _persist_to_env_file(settings.env_file, "TAX_ADVISOR_INIT", "true")
 
 
 def main() -> None:
     """Entry point for the tax-advisor CLI."""
+    from tax_advisor import __version__
+
+    if "--version" in sys.argv or "-V" in sys.argv:
+        print(f"tax-advisor {__version__}")
+        return
+
     from dotenv import load_dotenv
 
     # Load project-local .env first, then user-level .env (does not override)
@@ -266,6 +277,9 @@ def main() -> None:
     # Prompt for API key if needed
     _ensure_anthropic_api_key(settings, console)
     _ensure_openai_api_key(settings, console)
+
+    # Download IRS reference docs on first run (sets TAX_ADVISOR_INIT=true)
+    _first_run_check(settings, console)
 
     # Create initial session
     active_session = Session.create(sessions_dir=settings.sessions_dir)
@@ -362,6 +376,12 @@ def _handle_command(
     if lower == "/clear":
         agent.clear_history()
         console.print("[green]Conversation cleared.[/green]\n")
+        return True
+
+    if lower == "/version":
+        from tax_advisor import __version__
+
+        console.print(f"[cyan]tax-advisor {__version__}[/cyan]\n")
         return True
 
     # -- Session commands -----------------------------------------------------
@@ -778,9 +798,15 @@ def _handle_command(
             shutil.rmtree(settings.data_dir)
         settings.data_dir.mkdir(parents=True, exist_ok=True)
 
-        # Restore .env
+        # Restore .env, but remove TAX_ADVISOR_INIT so setup runs again
         if env_backup is not None:
-            settings.env_file.write_text(env_backup, encoding="utf-8")
+            restored_lines = [
+                line for line in env_backup.splitlines()
+                if not line.startswith("TAX_ADVISOR_INIT=")
+            ]
+            settings.env_file.write_text(
+                "\n".join(restored_lines) + "\n", encoding="utf-8"
+            )
 
         # Clear in-memory state
         agent.clear_history()

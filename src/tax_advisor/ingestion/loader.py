@@ -11,8 +11,13 @@ def _get_converter():
     """Return a cached DocumentConverter instance."""
     global _converter
     if _converter is None:
-        from docling.document_converter import DocumentConverter
-
+        try:
+            from docling.document_converter import DocumentConverter
+        except ImportError:
+            raise ImportError(
+                "PDF support requires the 'docling' package. "
+                "Install it with: uv sync --extra pdf"
+            )
         _converter = DocumentConverter()
     return _converter
 

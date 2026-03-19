@@ -1084,6 +1084,14 @@ wheels = [
 ]
 
 [[package]]
+name = "en-core-web-lg"
+version = "3.8.0"
+source = { url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl" }
+wheels = [
+    { url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl", hash = "sha256:293e9547a655b25499198ab15a525b05b9407a75f10255e405e8c3854329ab63" },
+]
+
+[[package]]
 name = "et-xmlfile"
 version = "2.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -3524,15 +3532,6 @@ wheels = [
 ]
 
 [[package]]
-name = "pip"
-version = "26.0.1"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/48/83/0d7d4e9efe3344b8e2fe25d93be44f64b65364d3c8d7bc6dc90198d5422e/pip-26.0.1.tar.gz", hash = "sha256:c4037d8a277c89b320abe636d59f91e6d0922d08a05b60e85e53b296613346d8", size = 1812747, upload-time = "2026-02-05T02:20:18.702Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/de/f0/c81e05b613866b76d2d1066490adf1a3dbc4ee9d9c839961c3fc8a6997af/pip-26.0.1-py3-none-any.whl", hash = "sha256:bdb1b08f4274833d62c1aa29e20907365a2ceb950410df15fc9521bad440122b", size = 1787723, upload-time = "2026-02-05T02:20:16.416Z" },
-]
-
-[[package]]
 name = "platformdirs"
 version = "4.9.4"
 source = { registry = "https://pypi.org/simple" }
@@ -5299,15 +5298,13 @@ wheels = [
 
 [[package]]
 name = "tax-advisor"
-version = "0.1.4"
+version = "0.1.5"
 source = { editable = "." }
 dependencies = [
     { name = "chromadb" },
-    { name = "docling" },
+    { name = "en-core-web-lg" },
     { name = "langchain-text-splitters" },
     { name = "litellm" },
-    { name = "openai" },
-    { name = "pip" },
     { name = "presidio-analyzer" },
     { name = "presidio-anonymizer" },
     { name = "prompt-toolkit" },
@@ -5320,6 +5317,9 @@ dependencies = [
 [package.optional-dependencies]
 bedrock = [
     { name = "boto3" },
+]
+pdf = [
+    { name = "docling" },
 ]
 
 [package.dev-dependencies]
@@ -5334,11 +5334,10 @@ dev = [
 requires-dist = [
     { name = "boto3", marker = "extra == 'bedrock'" },
     { name = "chromadb" },
-    { name = "docling" },
+    { name = "docling", marker = "extra == 'pdf'" },
+    { name = "en-core-web-lg", url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl" },
     { name = "langchain-text-splitters" },
     { name = "litellm" },
-    { name = "openai" },
-    { name = "pip" },
     { name = "presidio-analyzer" },
     { name = "presidio-anonymizer" },
     { name = "prompt-toolkit" },
@@ -5347,7 +5346,7 @@ requires-dist = [
     { name = "rich" },
     { name = "spacy" },
 ]
-provides-extras = ["bedrock"]
+provides-extras = ["bedrock", "pdf"]
 
 [package.metadata.requires-dev]
 dev = [

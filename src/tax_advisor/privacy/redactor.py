@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-import subprocess
-import sys
-
 from presidio_analyzer import AnalyzerEngine
 from presidio_anonymizer import AnonymizerEngine
 from presidio_anonymizer.entities import OperatorConfig
@@ -21,18 +18,6 @@ _ENTITY_OPERATOR_MAP: dict[str, str] = {
 
 _ENTITIES_TO_DETECT = list(_ENTITY_OPERATOR_MAP.keys())
 
-_SPACY_MODEL = "en_core_web_lg"
-
-
-def _ensure_spacy_model() -> None:
-    """Download the spaCy model if it is not already installed."""
-    try:
-        __import__(_SPACY_MODEL)
-    except ImportError:
-        subprocess.check_call(
-            [sys.executable, "-m", "spacy", "download", _SPACY_MODEL],
-        )
-
 
 class Redactor:
     """Detects and masks PII in text using Presidio.
@@ -43,7 +28,6 @@ class Redactor:
     """
 
     def __init__(self) -> None:
-        _ensure_spacy_model()
         self._analyzer = AnalyzerEngine()
         self._anonymizer = AnonymizerEngine()
         self._operators = {

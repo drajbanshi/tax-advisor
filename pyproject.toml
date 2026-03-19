@@ -1,6 +1,6 @@
 [project]
 name = "tax-advisor"
-version = "0.1.5"
+version = "0.1.6"
 description = "An agentic AI tax advisor CLI chat app"
 readme = "README.md"
 license = "MIT"
@@ -19,22 +19,21 @@ classifiers = [
 ]
 dependencies = [
     "litellm",
-    "openai",
     "rich",
     "prompt-toolkit",
-    "docling",
     "chromadb",
     "presidio-analyzer",
     "presidio-anonymizer",
     "spacy",
+    "en-core-web-lg @ https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl",
     "pyyaml",
     "python-dotenv",
     "langchain-text-splitters",
-    "pip",
 ]
 
 [project.optional-dependencies]
 bedrock = ["boto3"]
+pdf = ["docling"]
 
 [project.urls]
 Homepage = "https://github.com/drajbanshi/tax-advisor"
@@ -50,6 +49,9 @@ dev = [
 
 [project.scripts]
 tax-advisor = "tax_advisor.cli:main"
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/tax_advisor"]

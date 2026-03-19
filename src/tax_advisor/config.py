@@ -8,10 +8,10 @@ from pathlib import Path
 
 
 DEFAULT_PROVIDER = "anthropic"
-DEFAULT_MODEL = "anthropic/claude-opus-4-6-20250219"
+DEFAULT_MODEL = "anthropic/claude-opus-4-6"
 DEFAULT_TEMPERATURE = 0.3
 PROVIDER_DEFAULT_MODELS: dict[str, str] = {
-    "anthropic": "anthropic/claude-opus-4-6-20250219",
+    "anthropic": "anthropic/claude-opus-4-6",
     "openai": "openai/gpt-4o",
     "bedrock": "bedrock/anthropic.claude-3-5-sonnet-20241022-v2:0",
     "llama": "ollama/llama3.1",
@@ -181,11 +181,6 @@ class Settings:
     def reference_docs_dir(self) -> Path:
         """Directory for downloaded IRS reference documents."""
         return self.data_dir / "reference"
-
-    @property
-    def initialized_sentinel(self) -> Path:
-        """Sentinel file indicating first-run ingestion has been offered."""
-        return self.data_dir / ".initialized"
 
     @property
     def env_file(self) -> Path:

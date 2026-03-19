@@ -149,10 +149,14 @@ def ingest_documents(
                 console.print(f"    Loaded in {elapsed:.1f}s")
             else:
                 console.print("    Converting PDF to markdown …")
-                t0 = time.monotonic()
-                markdown = load_pdf_as_markdown(doc_path)
-                elapsed = time.monotonic() - t0
-                console.print(f"    Converted in {elapsed:.1f}s")
+                try:
+                    t0 = time.monotonic()
+                    markdown = load_pdf_as_markdown(doc_path)
+                    elapsed = time.monotonic() - t0
+                    console.print(f"    Converted in {elapsed:.1f}s")
+                except ImportError as exc:
+                    console.print(f"    [yellow]⚠ skipped: {exc}[/yellow]")
+                    continue
 
             metadata = extract_metadata(doc_path, tax_year=tax_year)
             doc = MarkdownDocument(text=markdown, metadata=metadata)
