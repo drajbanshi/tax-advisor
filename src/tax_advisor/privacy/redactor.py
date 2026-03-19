@@ -2,6 +2,12 @@
 
 from __future__ import annotations
 
+import shutil
+import subprocess
+import sys
+
+import spacy.about
+import spacy.util
 from presidio_analyzer import AnalyzerEngine
 from presidio_anonymizer import AnonymizerEngine
 from presidio_anonymizer.entities import OperatorConfig
@@ -18,6 +24,32 @@ _ENTITY_OPERATOR_MAP: dict[str, str] = {
 
 _ENTITIES_TO_DETECT = list(_ENTITY_OPERATOR_MAP.keys())
 
+_SPACY_MODEL = "en_core_web_lg"
+
+
+def _ensure_spacy_model() -> None:
+    """Download the spaCy model if it is not already installed."""
+    if spacy.util.is_package(_SPACY_MODEL):
+        return
+    # Build the wheel URL from spaCy's own download base URL
+    from spacy.cli.download import get_compatibility
+
+    compat = get_compatibility()
+    version = compat[_SPACY_MODEL][0]
+    wheel = f"{_SPACY_MODEL}-{version}-py3-none-any.whl"
+    tag = f"{_SPACY_MODEL}-{version}"
+    base_url = spacy.about.__download_url__
+    if not base_url.endswith("/"):
+        base_url += "/"
+    url = f"{base_url}{tag}/{wheel}"
+    # Prefer uv (used in uv-managed venvs), fall back to pip
+    uv = shutil.which("uv")
+    if uv:
+        cmd = [uv, "pip", "install", url]
+    else:
+        cmd = [sys.executable, "-m", "pip", "install", url]
+    subprocess.check_call(cmd)
+
 
 class Redactor:
     """Detects and masks PII in text using Presidio.
@@ -28,6 +60,7 @@ class Redactor:
     """
 
     def __init__(self) -> None:
+        _ensure_spacy_model()
         self._analyzer = AnalyzerEngine()
         self._anonymizer = AnonymizerEngine()
         self._operators = {

@@ -25,7 +25,6 @@ dependencies = [
     "presidio-analyzer",
     "presidio-anonymizer",
     "spacy",
-    "en-core-web-lg @ https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl",
     "pyyaml",
     "python-dotenv",
     "langchain-text-splitters",
@@ -49,9 +48,6 @@ dev = [
 
 [project.scripts]
 tax-advisor = "tax_advisor.cli:main"
-
-[tool.hatch.metadata]
-allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/tax_advisor"]
